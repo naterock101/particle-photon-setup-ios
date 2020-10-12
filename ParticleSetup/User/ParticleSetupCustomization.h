@@ -71,4 +71,7 @@
 @property(nonatomic, strong) NSString *skipAuthenticationMessage;    // Prompt to display to user when he's requesting to skip authentication
 @property(nonatomic) BOOL disableLogOutOption; // Do not allow the user to log out from the GetReady page.
 
+//Current Labs Changes
+@property (nonatomic, strong) NSString *deviceWorkingColor; // since we use different colors for normal state (i.e. cyan for coronas/green for reefbreeders)
+
 @end
