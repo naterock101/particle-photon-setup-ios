@@ -84,7 +84,7 @@
 
 -(UIImage *)brandImage {
     if (_brandImage == nil) {
-        _brandImage = [ParticleSetupMainController loadImageFromResourceBundle:@"spark-logo-head"];
+        //_brandImage = [ParticleSetupMainController loadImageFromResourceBundle:@"spark-logo-head"];
     }
     return _brandImage;
 }
