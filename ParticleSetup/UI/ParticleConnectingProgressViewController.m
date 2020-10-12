@@ -222,6 +222,11 @@ typedef NS_ENUM(NSInteger, ParticleSetupConnectionProgressState) {
 
 - (void)finishSetupWithResult:(ParticleSetupMainControllerResult)result {
     self.setupResult = result;
+     if (self.device == nil) {
+        NSDictionary *params = [[NSDictionary alloc] initWithObjectsAndKeys:self.deviceID, @"id", nil];
+        ParticleDevice *device = [[ParticleDevice alloc] initWithParams:params];
+        self.device = device;
+    }
     dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, 1.5 * NSEC_PER_SEC);
     dispatch_after(popTime, dispatch_get_main_queue(), ^(void) {
         [self performSegueWithIdentifier:@"done" sender:self];
