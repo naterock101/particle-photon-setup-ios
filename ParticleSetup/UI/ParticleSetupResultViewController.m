@@ -85,7 +85,7 @@
     } else {
         self.randomDeviceNamesArray = [NSArray arrayWithObject:@"nope"];
     }
-    [self doneButtonTapped:self]
+    [self doneButtonTapped:self];
 
 }
 
@@ -146,7 +146,13 @@
             } else {
                 [ParticleSetupCustomization sharedInstance].deviceWorkingColor = @"breathing cyan";
             }
-            self.longMessageLabel.text = [NSString stringWithFormat:@"Setup was successful, but since you do not own this device we cannot know if the {device} has connected to the Internet. If you see the LED %@ this means it worked! If not, please restart the setup process.", [ParticleSetupCustomization sharedInstance].deviceWorkingColor];
+            if ([ParticleSetupCustomization sharedInstance].isParticleDevice) {
+                //exisiting particle function
+                self.longMessageLabel.text = @"Your device has been successfully claimed to your account, however it is offline. If the device was already claimed before this setup, then the Wi-Fi connection may have failed, and you should try setup again.";
+            } else {
+                //esp32 stuff
+                self.longMessageLabel.text = @"Setup was successful. If you see the LED breathing white this means it worked! If not, please restart the setup process.";
+            }
             //current labs changes end
 #ifdef ANALYTICS
             [[SEGAnalytics sharedAnalytics] track:@"DeviceSetup_Success" properties:@{@"reason":@"not claimed"}];
@@ -231,8 +237,16 @@
 
 - (IBAction)doneButtonTapped:(id)sender {
     NSMutableDictionary *userInfo = [NSMutableDictionary new];
-    if (self.device)
+    if (self.device) {
         userInfo[kParticleSetupDidFinishDeviceKey] = self.device;
+    } else {
+        NSLog(@"test");
+        [[ParticleCloud sharedInstance] getDevice:@"nope" completion:^(ParticleDevice * _Nullable device, NSError * _Nullable error) {
+            if (!error) {
+                userInfo[kParticleSetupDidFinishDeviceKey] = device;
+            }
+        }];
+    }
 
     if (self.deviceID)
         userInfo[kParticleSetupDidFailDeviceIDKey] = self.deviceID;
@@ -250,27 +264,24 @@
                 }
             }];
         }
-
-        // Update zero notice to user
-        // TODO: condition message only if its really getting update zero (need event listening)
-        if (![[NSUserDefaults standardUserDefaults] boolForKey:@"shownUpdateZeroNotice"]) {
-            //current labs changes - though technically this alert will never show...
-            if ([ParticleSetupCustomization sharedInstance].deviceWorkingColor.length > 0) {
-                //we good
-            } else {
-                [ParticleSetupCustomization sharedInstance].deviceWorkingColor = @"breathing cyan";
+        
+        if ([ParticleSetupCustomization sharedInstance].isParticleDevice) {
+            //exisiting particle function
+            // Update zero notice to user
+            // TODO: condition message only if its really getting update zero (need event listening)
+            if (![[NSUserDefaults standardUserDefaults] boolForKey:@"shownUpdateZeroNotice"]) {
+                if ([ParticleSetupCustomization sharedInstance].deviceWorkingColor.length > 0) {
+                    //we good
+                } else {
+                    [ParticleSetupCustomization sharedInstance].deviceWorkingColor = @"breathing cyan";
+                }
+                NSString *alertMessage = [NSString stringWithFormat:@"If this is the first time you are setting up this device it might blink its LED in magenta color for a while, this means the device is currently updating its firmware from the cloud to the latest version. Please be patient and do not press the reset button. The Device LED will be %@ once update has completed and it has come online.", [ParticleSetupCustomization sharedInstance].deviceWorkingColor];
+                UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Firmware update" message:alertMessage delegate:nil cancelButtonTitle:@"Understood" otherButtonTitles:nil];
+               // [alert show];
+                
+                [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"shownUpdateZeroNotice"];
+                [[NSUserDefaults standardUserDefaults] synchronize];
             }
-            NSString *alertMessage = [NSString stringWithFormat:@"If this is the first time you are setting up this device it might blink its LED in magenta color for a while, this means the device is currently updating its firmware from the cloud to the latest version. Please be patient and do not press the reset button. The Device LED will be %@ once update has completed and it has come online.", [ParticleSetupCustomization sharedInstance].deviceWorkingColor];
-            //current labs changes end
-            
-            UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Firmware update" message:alertMessage delegate:nil cancelButtonTitle:@"Understood" otherButtonTitles:nil];
-
-            //Current Labs change to disable the alert about mageneta breathing
-            //[alert show];
-            //current labs changes end
-            
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"shownUpdateZeroNotice"];
-            [[NSUserDefaults standardUserDefaults] synchronize];
         }
     }
 

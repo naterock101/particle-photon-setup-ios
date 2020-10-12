@@ -73,5 +73,6 @@
 
 //Current Labs Changes
 @property (nonatomic, strong) NSString *deviceWorkingColor; // since we use different colors for normal state (i.e. cyan for coronas/green for reefbreeders)
+@property (nonatomic) BOOL isParticleDevice; // so we can also use esp32 devices
 
 @end

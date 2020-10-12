@@ -89,7 +89,7 @@
 
 
 "ParticleSetupStrings.GetReady.Text1" = "Plug in your {device} to power it on";
-"ParticleSetupStrings.GetReady.Text2" = "The on-board LED should be blinking blue. If not, hold the {mode button} for 3 seconds";
+"ParticleSetupStrings.GetReady.Text2" = "The on-board LED should be blinking blue. If not, hold the {mode button} for 5 seconds";
 "ParticleSetupStrings.GetReady.Text3" = "Make sure your iOS device is connected to the Internet";
 "ParticleSetupStrings.GetReady.iPhone4MoreInstructions" = "Scroll down for more instructions:\n{{instructions}}";
 

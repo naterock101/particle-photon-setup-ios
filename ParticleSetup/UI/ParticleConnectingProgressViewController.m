@@ -273,34 +273,76 @@ typedef NS_ENUM(NSInteger, ParticleSetupConnectionProgressState) {
 
 - (void)connectDeviceToNetwork // step 1
 {
-    // --- Connect-AP ---
-    ParticleSetupCommManager *managerForConnect = [[ParticleSetupCommManager alloc] init];
-    if (self.currentState == ParticleSetupConnectionProgressStateConnectToWifi) {
-        [managerForConnect connectAP:^(id responseCode, NSError *error) {
-            while (([ParticleSetupCommManager checkParticleDeviceWifiConnection:[ParticleSetupCustomization sharedInstance].networkNamePrefix]) && (self.disconnectRetries < kMaxRetriesDisconnectFromDevice)) {
+    //current labs changes
+    if ([ParticleSetupCustomization sharedInstance].isParticleDevice) {
+    //exisiting particle function
+        // --- Connect-AP ---
+        ParticleSetupCommManager *managerForConnect = [[ParticleSetupCommManager alloc] init];
+        if (self.currentState == ParticleSetupConnectionProgressStateConnectToWifi) {
+            [managerForConnect connectAP:^(id responseCode, NSError *error) {
+                while (([ParticleSetupCommManager checkParticleDeviceWifiConnection:[ParticleSetupCustomization sharedInstance].networkNamePrefix]) && (self.disconnectRetries < kMaxRetriesDisconnectFromDevice)) {
+                    [NSThread sleepForTimeInterval:2.0];
+                    self.disconnectRetries++;
+                }
+
+                // are we still connected to device?
+                if ([ParticleSetupCommManager checkParticleDeviceWifiConnection:[ParticleSetupCustomization sharedInstance].networkNamePrefix]) {
+                    if (self.connectAPRetries++ >= kMaxRetriesConnectAP) {
+                        [self setCurrentConnectionProgressStateError:YES];
+                        [self finishSetupWithResult:ParticleSetupMainControllerResultFailureCannotDisconnectFromDevice];
+                    } else {
+                        self.disconnectRetries = 0;
+                        [self connectDeviceToNetwork]; // recursion retry sending connect-ap
+                        return;
+                    }
+                } else {
+                    if (self.currentState == ParticleSetupConnectionProgressStateConnectToWifi) {
+                        [self nextConnectionProgressState];
+                        [self waitForCloudConnection];
+                    }
+                }
+            }];
+        }
+    } else {
+    //esp32 stuff
+        // --- Connect-AP ---
+        ParticleSetupCommManager *managerForConnect = [[ParticleSetupCommManager alloc] init];
+    //    self.connectAPsent = YES;
+    //    if (!self.disconnectedFromDevice)
+        if (self.currentState == ParticleSetupConnectionProgressStateConnectToWifi)
+        {
+            
+            while (([ParticleSetupCommManager checkParticleDeviceWifiConnection:[ParticleSetupCustomization sharedInstance].networkNamePrefix]) && (self.disconnectRetries < kMaxRetriesDisconnectFromDevice))
+            {
                 [NSThread sleepForTimeInterval:2.0];
                 self.disconnectRetries++;
             }
-
+            
             // are we still connected to device?
-            if ([ParticleSetupCommManager checkParticleDeviceWifiConnection:[ParticleSetupCustomization sharedInstance].networkNamePrefix]) {
-                if (self.connectAPRetries++ >= kMaxRetriesConnectAP) {
+            if ([ParticleSetupCommManager checkParticleDeviceWifiConnection:[ParticleSetupCustomization sharedInstance].networkNamePrefix])
+            {
+                if (self.connectAPRetries++ >= kMaxRetriesConnectAP)
+                {
                     [self setCurrentConnectionProgressStateError:YES];
                     [self finishSetupWithResult:ParticleSetupMainControllerResultFailureCannotDisconnectFromDevice];
-                } else {
+                }
+                else
+                {
                     self.disconnectRetries = 0;
                     [self connectDeviceToNetwork]; // recursion retry sending connect-ap
                     return;
                 }
-            } else {
-                if (self.currentState == ParticleSetupConnectionProgressStateConnectToWifi) {
+            }
+            else
+            {
+                if (self.currentState == ParticleSetupConnectionProgressStateConnectToWifi)
+                {
                     [self nextConnectionProgressState];
                     [self waitForCloudConnection];
                 }
             }
-        }];
+        }
     }
-
 }
 
 
@@ -394,40 +436,46 @@ typedef NS_ENUM(NSInteger, ParticleSetupConnectionProgressState) {
 
 - (void)checkDeviceIsClaimed // step 4
 {
-    // --- Claim device ---
-    if (self.gotStatusEventFromDevice) {
-        [self getDeviceAndFinishSetup];
-    }
+    //current labs changes
+    if ([ParticleSetupCustomization sharedInstance].isParticleDevice) {
+         //exisiting particle function
+        // --- Claim device ---
+        if (self.gotStatusEventFromDevice) {
+            [self getDeviceAndFinishSetup];
+        }
 
-    [[ParticleCloud sharedInstance] getDevices:^(NSArray *devices, NSError *error) {
-        BOOL deviceClaimed = NO;
-        if (devices) {
-            for (ParticleDevice *device in devices) {
-                if ([device.id isEqualToString:self.deviceID]) {
-                    deviceClaimed = YES;
+        [[ParticleCloud sharedInstance] getDevices:^(NSArray *devices, NSError *error) {
+            BOOL deviceClaimed = NO;
+            if (devices) {
+                for (ParticleDevice *device in devices) {
+                    if ([device.id isEqualToString:self.deviceID]) {
+                        deviceClaimed = YES;
+                    }
                 }
             }
-        }
 
-        if ((error) || (!deviceClaimed)) {
-            self.claimRetries++;
-            if (self.claimRetries >= kMaxRetriesClaim - 1) {
-                [self setCurrentConnectionProgressStateError:YES];
-                [self finishSetupWithResult:ParticleSetupMainControllerResultFailureClaiming];
+            if ((error) || (!deviceClaimed)) {
+                self.claimRetries++;
+                if (self.claimRetries >= kMaxRetriesClaim - 1) {
+                    [self setCurrentConnectionProgressStateError:YES];
+                    [self finishSetupWithResult:ParticleSetupMainControllerResultFailureClaiming];
+                } else {
+                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t) (1 * NSEC_PER_SEC)), dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                        [self checkDeviceIsClaimed]; // recursion retry
+                        return;
+                    });
+
+                }
             } else {
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t) (1 * NSEC_PER_SEC)), dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                    [self checkDeviceIsClaimed]; // recursion retry
-                    return;
-                });
+                [self getDeviceAndFinishSetup];
+
 
             }
-        } else {
-            [self getDeviceAndFinishSetup];
-
-
-        }
-    }];
-
+        }];
+     } else {
+         //esp32 stuff
+          [self getDeviceAndFinishSetup];
+     }
 }
 
 

@@ -128,9 +128,20 @@
 
     cell.wifiStrengthImageView.image = [cell.wifiStrengthImageView.image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     cell.wifiStrengthImageView.tintColor = [ParticleSetupCustomization sharedInstance].normalTextColor;;
+    
+    //current labs changes
+    //ParticleSetupWifiSecurityType sec = [self.wifiList[row][@"sec"] intValue];
+    ParticleSetupWifiSecurityType sec;
+    ESPSetupWifiSecurityType espsec;
+    if ([ParticleSetupCustomization sharedInstance].isParticleDevice) {
+        //exisiting particle function
+        sec = [self.wifiList[row][@"sec"] intValue];
+    } else {
+        //esp32 stuff
+        espsec = [self.wifiList[indexPath.row][@"auth"] intValue];
+    }
 
-    ParticleSetupWifiSecurityType sec = [self.wifiList[row][@"sec"] intValue];
-    if (sec != ParticleSetupWifiSecurityTypeOpen) {
+    if ((sec && sec != ParticleSetupWifiSecurityTypeOpen) || ((espsec && sec != ESPSetupWifiSecurityTypeOpen))) {
         cell.securedNetworkIconImageView.hidden = NO;
         [cell.securedNetworkIconImageView setImage:[ParticleSetupMainController loadImageFromResourceBundle:@"lock"]];
         cell.securedNetworkIconImageView.image = [cell.securedNetworkIconImageView.image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
@@ -218,13 +229,31 @@
     [self.wifiTableView deselectRowAtIndexPath:indexPath animated:YES];
     self.selectedNetworkIndexPath = indexPath;
 
-    ParticleSetupWifiSecurityType secInt = [self.wifiList[indexPath.row][@"sec"] intValue];
-    self.selectedNetworkSecurity = [NSNumber numberWithInt:secInt];
-    self.selectedNetworkChannel = self.wifiList[indexPath.row][@"ch"];
+    //current labs changes
+    //ParticleSetupWifiSecurityType secInt = [self.wifiList[indexPath.row][@"sec"] intValue];
+    //self.selectedNetworkChannel = self.wifiList[indexPath.row][@"ch"];
+    //self.selectedNetworkSecurity = [NSNumber numberWithInt:secInt];
+
+    ParticleSetupWifiSecurityType secInt;
+    ESPSetupWifiSecurityType espsecInt;
+    if ([ParticleSetupCustomization sharedInstance].isParticleDevice) {
+        //exisiting particle function
+        secInt = [self.wifiList[indexPath.row][@"sec"] intValue];
+        self.selectedNetworkChannel = self.wifiList[indexPath.row][@"ch"];
+        self.selectedNetworkSecurity = [NSNumber numberWithInt:secInt];
+    } else {
+        //esp32 stuff
+        espsecInt = [self.wifiList[indexPath.row][@"auth"] intValue];
+        self.selectedNetworkChannel = self.wifiList[indexPath.row][@"channel"];
+        self.selectedNetworkSecurity = [NSNumber numberWithInt:espsecInt];
+    }
+    //current labs changes end
+    
     self.selectedNetworkSSID = self.wifiList[indexPath.row][@"ssid"];
     [self.checkConnectionTimer invalidate];
 
-    if (secInt == ParticleSetupWifiSecurityTypeOpen) {
+    //current labs changes changes the if statement to include esp options
+    if ((secInt && secInt == ParticleSetupWifiSecurityTypeOpen) || (espsecInt && espsecInt == ESPSetupWifiSecurityTypeOpen)) {
 #ifdef ANALYTICS
         [[SEGAnalytics sharedAnalytics] track:@"DeviceSetup_SelectedOpenNetwork"];
 #endif

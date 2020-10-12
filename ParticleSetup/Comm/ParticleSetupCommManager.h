@@ -9,7 +9,6 @@
 #import <Foundation/Foundation.h>
 #import "ParticleSetupConnection.h"
 
-
 #define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v)  ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
 
 extern NSString *const kParticleSetupConnectionEndpointAddress;
@@ -24,6 +23,15 @@ typedef NS_ENUM(NSInteger, ParticleSetupWifiSecurityType) {
     ParticleSetupWifiSecurityTypeWPA2_AES_PSK   = 0x00400004, /**< WPA2 Security with AES                  */
     ParticleSetupWifiSecurityTypeWPA2_TKIP_PSK  = 0x00400002, /**< WPA2 Security with TKIP                 */
     ParticleSetupWifiSecurityTypeWPA2_MIXED_PSK = 0x00400006, /**< WPA2 Security with AES & TKIP           */
+};
+
+typedef NS_ENUM(NSInteger, ESPSetupWifiSecurityType) {
+    ESPSetupWifiSecurityTypeOpen           = 0,          /**< Unsecured                               */
+    ESPSetupWifiSecurityTypeWEP            = 1,          /**< WEP Security   */
+    ESPSetupWifiSecurityTypeWEP_PSK        = 2,          /**< WEP Security with PSK */
+    ESPSetupWifiSecurityTypeWPA2_PSK       = 3,          /**< WPA2 Security with PSK                  */
+    ESPSetupWifiSecurityTypeWPA_WPA2_PSK   = 4,          /**< WPA/WPA2/PSK                  */
+    ESPSetupWifiSecurityTypeWPA2_ENT       = 5,          /**<WPA2/ENT               */
 };
 
 

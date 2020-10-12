@@ -13,6 +13,9 @@
 #import <SystemConfiguration/CaptiveNetwork.h>
 #import "ParticleSetupSecurityManager.h"
 #import <NetworkExtension/NetworkExtension.h>
+//current labs changes
+#import "ParticleSetupCustomization.h"
+
 //#import "FastSocket.h"
 
 // new iOS 9 requirements:
@@ -40,7 +43,8 @@ int const kParticleSetupConnectionEndpointAddressHex = 0xC0A80001;
 int const kParticleSetupConnectionEndpointPort = 5609;
 
 
-@interface ParticleSetupCommManager () <ParticleSetupConnectionDelegate>
+@interface ParticleSetupCommManager () <ParticleSetupConnectionDelegate, NSURLSessionDelegate, NSURLSessionDownloadDelegate>
+//current labs changes added NSURLSessionDelegate, NSURLSessionDownloadDelegate
 
 @property(nonatomic, strong) ParticleSetupConnection *connection;
 @property(atomic) ParticleSetupCommandType commandType; // last command type
@@ -329,72 +333,160 @@ int const kParticleSetupConnectionEndpointPort = 5609;
 
 
 - (void)configureAP:(NSString *)ssid passcode:(NSString *)passcode security:(NSNumber *)securityType channel:(NSNumber *)channel completion:(void (^)(id responseCode, NSError *error))completion {
-    if ([self canSendCommandCallCompletionForError:completion]) {
-        __weak ParticleSetupCommManager *weakSelf = self;
-        self.commandCompletionBlock = completion;
+    
+    //current labs changes
+    if ([ParticleSetupCustomization sharedInstance].isParticleDevice) {
+            //exisiting particle function
+        if ([self canSendCommandCallCompletionForError:completion]) {
+            __weak ParticleSetupCommManager *weakSelf = self;
+            self.commandCompletionBlock = completion;
 
-        self.commandSendBlock = ^{
+            self.commandSendBlock = ^{
 
-            NSDictionary *requestDataDict;
+                NSDictionary *requestDataDict;
 
-            // Truncate passcode to 64 chars maximum
-            NSRange stringRange = {0, MIN(passcode.length, 64)};
-            // adjust the range to include dependent chars
-            stringRange = [passcode rangeOfComposedCharacterSequencesForRange:stringRange];
-            // Now you can create the short string
-            NSString *passcodeTruncated = [passcode substringWithRange:stringRange];
-            NSString *hexEncodedEncryptedPasscodeStr;
+                // Truncate passcode to 64 chars maximum
+                NSRange stringRange = {0, MIN(passcode.length, 64)};
+                // adjust the range to include dependent chars
+                stringRange = [passcode rangeOfComposedCharacterSequencesForRange:stringRange];
+                // Now you can create the short string
+                NSString *passcodeTruncated = [passcode substringWithRange:stringRange];
+                NSString *hexEncodedEncryptedPasscodeStr;
 
-            if (ENCRYPT_PWD) {
-                SecKeyRef pubKey = [ParticleSetupSecurityManager getPublicKey];
-                if (pubKey != NULL) {
-                    // encrypt it using the stored public key
-                    NSData *plainTextData = [passcodeTruncated dataUsingEncoding:NSUTF8StringEncoding];
-                    NSData *cipherTextData = [ParticleSetupSecurityManager encryptWithPublicKey:pubKey plainText:plainTextData];
-                    if (cipherTextData != nil) {
-                        // encode the encrypted data to a hex string
-                        hexEncodedEncryptedPasscodeStr = [ParticleSetupSecurityManager encodeDataToHexString:cipherTextData];
-                        requestDataDict = @{@"idx": @0, @"ssid": ssid, @"pwd": hexEncodedEncryptedPasscodeStr, @"sec": securityType, @"ch": channel};
+                if (ENCRYPT_PWD) {
+                    SecKeyRef pubKey = [ParticleSetupSecurityManager getPublicKey];
+                    if (pubKey != NULL) {
+                        // encrypt it using the stored public key
+                        NSData *plainTextData = [passcodeTruncated dataUsingEncoding:NSUTF8StringEncoding];
+                        NSData *cipherTextData = [ParticleSetupSecurityManager encryptWithPublicKey:pubKey plainText:plainTextData];
+                        if (cipherTextData != nil) {
+                            // encode the encrypted data to a hex string
+                            hexEncodedEncryptedPasscodeStr = [ParticleSetupSecurityManager encodeDataToHexString:cipherTextData];
+                            requestDataDict = @{@"idx": @0, @"ssid": ssid, @"pwd": hexEncodedEncryptedPasscodeStr, @"sec": securityType, @"ch": channel};
+                        } else {
+                            completion(nil, [NSError errorWithDomain:@"ParticleSetupSecurityManager" code:2007 userInfo:@{NSLocalizedDescriptionKey: @"Failed to encrypt passcode"}]);
+                            return; //?
+                        }
                     } else {
-                        completion(nil, [NSError errorWithDomain:@"ParticleSetupSecurityManager" code:2007 userInfo:@{NSLocalizedDescriptionKey: @"Failed to encrypt passcode"}]);
+                        completion(nil, [NSError errorWithDomain:@"ParticleSetupSecurityManager" code:2008 userInfo:@{NSLocalizedDescriptionKey: @"Failed to retrieve device public key from keychain"}]);
                         return; //?
                     }
                 } else {
-                    completion(nil, [NSError errorWithDomain:@"ParticleSetupSecurityManager" code:2008 userInfo:@{NSLocalizedDescriptionKey: @"Failed to retrieve device public key from keychain"}]);
-                    return; //?
+                    // no passcode encryption // TODO: remove when encryption functional
+                    requestDataDict = @{@"idx": @0, @"ssid": ssid, @"pwd": passcodeTruncated, @"sec": securityType, @"ch": channel};
                 }
-            } else {
-                // no passcode encryption // TODO: remove when encryption functional
-                requestDataDict = @{@"idx": @0, @"ssid": ssid, @"pwd": passcodeTruncated, @"sec": securityType, @"ch": channel};
+
+                NSError *error;
+                NSString *jsonString;
+                NSData *jsonData = [NSJSONSerialization dataWithJSONObject:requestDataDict
+                                                                   options:0
+                                                                     error:&error];
+
+                if (jsonData)
+                    jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+                else
+                    completion(nil, [NSError errorWithDomain:@"ParticleSetupCommManangerError" code:2002 userInfo:@{NSLocalizedDescriptionKey: @"Cannot process configureAP command data to JSON"}]);
+
+                NSString *commandStr = [NSString stringWithFormat:@"configure-ap\n%ld\n\n%@", (unsigned long) jsonString.length, jsonString];
+                weakSelf.commandType = ParticleSetupCommandTypeConfigureAP;
+                [weakSelf.connection writeString:commandStr completion:^(NSError *error) {
+                    if ((error) && (completion)) {
+                        completion(nil, error);
+                        weakSelf.commandCompletionBlock = nil;
+                        //                weakSelf.commandType = ParticleSetupCommandTypeNone;
+                    }
+                }];
+
+            };
+
+            [self openConnection];
+        }
+    } else {
+        //esp32 stuff
+        if ([self canSendCommandCallCompletionForError:completion])
+        {
+            __weak ParticleSetupCommManager *weakSelf = self;
+            self.commandCompletionBlock = completion;
+            
+            //curl -XPOST -H "Content-Type: application/json" "192.168.4.1/rpc/WiFi.PortalTest" -d '{"ssid":"blah","pass":"derp","user":null}'
+            //turned into
+            //curl --digest -u "wifi:test" -XPOST -H "Content-Type: application/json" "192.168.4.1/rpc/Mendel.ConnectSSID" -d '{"ssid": "StationName","pass": "password","user": null }'
+
+            NSDictionary *postBody = @{};
+            if ([securityType intValue] == 0) {
+                // {"ssid":"ssid","pass":"",user:null}
+                postBody = @{@"ssid" : ssid, @"pass" : @"", @"user" : [NSNull null]};
+            } else if ([securityType intValue] >= 1 && [securityType intValue] <= 4) {
+                // {"ssid":"ssid","pass":"password",user:null}
+                postBody = @{@"ssid" : ssid, @"pass" : passcode, @"user" : [NSNull null]};
+            } else if ([securityType intValue] == 5) {
+                //{"ssid":"ssid","pass":"password",user:"user"}
+                postBody = @{@"ssid" : ssid, @"pass" : passcode, @"user" : @"user"};
             }
-
+            
+            NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
+            NSURLSession *session = [NSURLSession sessionWithConfiguration:config
+                                                     delegate:self
+                                                delegateQueue:nil];
+            NSString *requestString = @"http://192.168.4.1/rpc/WiFi.ConnectSSID";
+            NSURL *url = [NSURL URLWithString:requestString];
+            NSLog(@"sessasdf");
             NSError *error;
-            NSString *jsonString;
-            NSData *jsonData = [NSJSONSerialization dataWithJSONObject:requestDataDict
-                                                               options:0
-                                                                 error:&error];
+            NSData *jsonData = [NSJSONSerialization dataWithJSONObject:postBody
+                   options:0 error:&error];
 
-            if (jsonData)
-                jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-            else
-                completion(nil, [NSError errorWithDomain:@"ParticleSetupCommManangerError" code:2002 userInfo:@{NSLocalizedDescriptionKey: @"Cannot process configureAP command data to JSON"}]);
+            NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
+            [req setHTTPBody: jsonData];
+            [req setHTTPMethod:@"POST"];
+            [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
 
-            NSString *commandStr = [NSString stringWithFormat:@"configure-ap\n%ld\n\n%@", (unsigned long) jsonString.length, jsonString];
-            weakSelf.commandType = ParticleSetupCommandTypeConfigureAP;
-            [weakSelf.connection writeString:commandStr completion:^(NSError *error) {
-                if ((error) && (completion)) {
-                    completion(nil, error);
-                    weakSelf.commandCompletionBlock = nil;
-                    //                weakSelf.commandType = ParticleSetupCommandTypeNone;
-                }
+            NSURLSessionDataTask *dataTask =
+                [session dataTaskWithRequest:req completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
+                    NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+                    if(httpResponse.statusCode == 200) {
+                        id jsonResp = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+                        if ([jsonResp isKindOfClass:[NSDictionary class]]){
+                            NSDictionary *dictRes = [jsonResp copy];
+                            NSLog(@"The dictRes is - %@",dictRes);
+                            if (dictRes[@"result"] == [NSNumber numberWithBool:true]) {
+                                completion(0,nil);
+                            } else {
+                                completion(dictRes[@"result"],nil);
+                            }
+                        } else{
+                            NSArray *arrRes = [jsonResp copy];
+                            NSLog(@"The dictRes is - %@",arrRes);
+                        }
+                    } else {
+                        NSLog(@"uploadTaskWithRequest error: %@", error);
+                        completion(nil, error);
+                    }
             }];
-
-        };
-
-        [self openConnection];
+            [dataTask resume];
+        }
+        
     }
-
 }
+
+//current labs changes
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential * _Nullable))completionHandler
+{
+    NSString *authMethod = [[challenge protectionSpace] authenticationMethod];
+
+    if ([authMethod isEqualToString:NSURLAuthenticationMethodServerTrust]) {
+
+        NSURLCredential *credential = [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust];
+         completionHandler(NSURLSessionAuthChallengeUseCredential,credential);
+    } else {
+        NSURLCredential *cred = [NSURLCredential credentialWithUser:@"wifi"
+                                                           password:@"test"
+                                                        persistence:NSURLCredentialPersistenceNone];
+        [[challenge sender] useCredential:cred forAuthenticationChallenge:challenge];
+        completionHandler(NSURLSessionAuthChallengeUseCredential, cred);
+        NSLog(@"Finished Challenge");
+    }
+}
+
 
 
 - (void)setClaimCode:(NSString *)claimCode completion:(void (^)(id, NSError *))completion {

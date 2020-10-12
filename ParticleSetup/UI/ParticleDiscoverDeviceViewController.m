@@ -35,7 +35,7 @@
 #import <SEGAnalytics.h>
 #endif
 
-@interface ParticleDiscoverDeviceViewController () <NSStreamDelegate, UIAlertViewDelegate, ParticleSelectNetworkViewControllerDelegate>
+@interface ParticleDiscoverDeviceViewController () <NSStreamDelegate, UIAlertViewDelegate, ParticleSelectNetworkViewControllerDelegate, NSURLSessionDelegate, NSURLSessionDownloadDelegate> //added NSURLSessionDelegate, NSURLSessionDownloadDelegate for current labs changes
 @property(weak, nonatomic) IBOutlet UIImageView *wifiSignalImageView;
 
 @property(weak, nonatomic) IBOutlet UILabel *networkNameLabel;
@@ -293,51 +293,156 @@
 
 
 - (void)getDeviceID {
-    if (!self.detectedDeviceID) {
-        [self.checkConnectionTimer invalidate];
+    //current labs changes
+    if ([ParticleSetupCustomization sharedInstance].isParticleDevice) {
+        //exisiting particle function
+        if (!self.detectedDeviceID) {
+            [self.checkConnectionTimer invalidate];
 
-        ParticleSetupCommManager *manager = [[ParticleSetupCommManager alloc] init];
-        [manager deviceID:^(id deviceResponseDict, NSError *error) {
-            if (error) {
-                NSLog(@"Could not send device-id command: %@", error.localizedDescription);
-                [self restartDeviceDetectionTimer];
-                [self resetWifiSignalIconWithDelay];
+            ParticleSetupCommManager *manager = [[ParticleSetupCommManager alloc] init];
+            [manager deviceID:^(id deviceResponseDict, NSError *error) {
+                if (error) {
+                    NSLog(@"Could not send device-id command: %@", error.localizedDescription);
+                    [self restartDeviceDetectionTimer];
+                    [self resetWifiSignalIconWithDelay];
 
-            } else {
+                } else {
 
-                self.detectedDeviceID = (NSString *) deviceResponseDict[@"id"]; //TODO: fix that dict interpretation is done in comm manager (layer completion)
-                self.detectedDeviceID = [self.detectedDeviceID lowercaseString];
-                self.isDetectedDeviceClaimed = [deviceResponseDict[@"c"] boolValue];
+                    self.detectedDeviceID = (NSString *) deviceResponseDict[@"id"]; //TODO: fix that dict interpretation is done in comm manager (layer completion)
+                    self.detectedDeviceID = [self.detectedDeviceID lowercaseString];
+                    self.isDetectedDeviceClaimed = [deviceResponseDict[@"c"] boolValue];
 
-                [self photonPublicKey];
-            }
-        }];
+                    [self photonPublicKey];
+                }
+            }];
+        } else {
+            [self photonPublicKey];
+        }
     } else {
+        //esp32 stuff
         [self photonPublicKey];
     }
 }
 
 
 - (void)photonScanAP {
-    if (!self.scannedWifiList) {
-        ParticleSetupCommManager *manager = [[ParticleSetupCommManager alloc] init];
-        [manager scanAP:^(id scanResponse, NSError *error) {
-            if (error) {
-                NSLog(@"Could not send scan-ap command: %@", error.localizedDescription);
-                [self restartDeviceDetectionTimer];
-                [self resetWifiSignalIconWithDelay];
-            } else {
-                if (scanResponse) {
-                    self.scannedWifiList = scanResponse;
-                    [self checkDeviceOwnershipChange];
+    //current labs changes
+    if ([ParticleSetupCustomization sharedInstance].isParticleDevice) {
+       //exisiting particle function
+        if (!self.scannedWifiList) {
+            ParticleSetupCommManager *manager = [[ParticleSetupCommManager alloc] init];
+            [manager scanAP:^(id scanResponse, NSError *error) {
+                if (error) {
+                    NSLog(@"Could not send scan-ap command: %@", error.localizedDescription);
+                    [self restartDeviceDetectionTimer];
+                    [self resetWifiSignalIconWithDelay];
+                } else {
+                    if (scanResponse) {
+                        self.scannedWifiList = scanResponse;
+                        [self checkDeviceOwnershipChange];
+                    }
+
                 }
+            }];
+        } else {
+            [self checkDeviceOwnershipChange];
+        }
+   } else {
+       //esp32 stuff
+       if (!self.scannedWifiList) {
+       NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
+       NSURLSession *session = [NSURLSession sessionWithConfiguration:config
+                                                delegate:self
+                                           delegateQueue:nil];
+       NSString *requestString = @"http://192.168.4.1/rpc/Sys.GetInfo";
+       NSURL *url = [NSURL URLWithString:requestString];
+       NSURLRequest *req = [NSURLRequest requestWithURL:url];
 
-            }
-        }];
+       NSURLSessionDataTask *dataTask =
+           [session dataTaskWithRequest:req completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
+
+               NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+               if(httpResponse.statusCode == 200) {
+                   NSError *parseError = nil;
+                   NSDictionary *responseDictionary = [NSJSONSerialization JSONObjectWithData:data options:0 error:&parseError];
+                   //NSLog(@"The response is - %@",responseDictionary);
+                   //save the important information, which means we need to grab the particle device here
+                   [[ParticleCloud sharedInstance] getDevice:[responseDictionary valueForKey:@"id"] completion:^(ParticleDevice *device, NSError *error) {
+                       // --- Done ---
+                       if (!error) {
+                           device.nonParticleProduct = [responseDictionary valueForKey:@"app"];
+                           device.nonParticleDeviceID = [responseDictionary valueForKey:@"id"];
+                           self.detectedDeviceID = device.nonParticleDeviceID;
+                       } else {
+                           NSLog(@"testfadsf");
+                          // [self restartDeviceDetectionTimer];
+                          // [self resetWifiSignalIconWithDelay];
+                       }
+                   }];
+
+                   //second scan for the available wifi's
+                   NSURL *url2 = [NSURL URLWithString:@"http://192.168.4.1/rpc/WiFi.PortalScan"];
+                   NSURLRequest *req2 = [NSURLRequest requestWithURL:url2];
+
+                   NSURLSessionDataTask *dataTask2 =
+                     [session dataTaskWithRequest:req2 completionHandler:^(NSData * _Nullable data2, NSURLResponse * _Nullable response, NSError * _Nullable error) {
+                         NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+                         if(httpResponse.statusCode == 200) {
+                             NSError *error2 = nil;
+                             NSArray *responseArray = [NSJSONSerialization JSONObjectWithData:data2 options:0 error:&error2];
+                             //NSLog(@"The response is - %@",responseArray);
+                             if (responseArray.count > 0) {
+                                 self.scannedWifiList = responseArray;
+                                 self.needToCheckDeviceClaimed = NO;
+                                 [self.checkConnectionTimer invalidate];
+                                 dispatch_async(dispatch_get_main_queue(), ^{
+                                     [self goToWifiListScreen];
+                                 });
+                             } else {
+                                 NSLog(@"Errorasdf: %@", error);
+
+                               //  [self restartDeviceDetectionTimer];
+                                // [self resetWifiSignalIconWithDelay];
+                             }
+                         } else {
+                             [self restartDeviceDetectionTimer];
+                             [self resetWifiSignalIconWithDelay];
+                         }
+                   }];
+                   [dataTask2 resume];
+
+                   
+               } else {
+                   NSLog(@"Error: %@", error);
+                   [self restartDeviceDetectionTimer];
+                   [self resetWifiSignalIconWithDelay];
+               }
+           }];
+
+            [dataTask resume];
+       } else {
+           [self checkDeviceOwnershipChange];
+       }
+   }
+}
+
+//current labs addition
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential * _Nullable))completionHandler
+{
+    NSString *authMethod = [[challenge protectionSpace] authenticationMethod];
+    NSLog(@"what is going on here?");
+    if ([authMethod isEqualToString:NSURLAuthenticationMethodServerTrust]) {
+
+        NSURLCredential *credential = [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust];
+         completionHandler(NSURLSessionAuthChallengeUseCredential,credential);
     } else {
-        [self checkDeviceOwnershipChange];
+        NSURLCredential *cred = [NSURLCredential credentialWithUser:@"wifi"
+                                                           password:@"test"
+                                                        persistence:NSURLCredentialPersistenceNone];
+        [[challenge sender] useCredential:cred forAuthenticationChallenge:challenge];
+        completionHandler(NSURLSessionAuthChallengeUseCredential, cred);
+        NSLog(@"Finished Challenge");
     }
-
 }
 
 
@@ -376,7 +481,9 @@
                     if ([ParticleCloud sharedInstance].isAuthenticated) {
                         // that means device is claimed by somebody else - we want to check that with user (and set claimcode if user wants to change ownership)
                         NSString *messageStr = [ParticleSetupStrings_DiscoverDevices_Prompt_ClaimOwnership_Message variablesReplaced];
-                        self.changeOwnershipAlertView = [[UIAlertView alloc] initWithTitle:[ParticleSetupStrings_DiscoverDevices_Prompt_ClaimOwnership_Title variablesReplaced] message:messageStr delegate:self cancelButtonTitle:nil otherButtonTitles:[ParticleSetupStrings_Action_Yes variablesReplaced], [ParticleSetupStrings_Action_No variablesReplaced], nil];
+                        //current labs change
+                        //self.changeOwnershipAlertView = [[UIAlertView alloc] initWithTitle:[ParticleSetupStrings_DiscoverDevices_Prompt_ClaimOwnership_Title variablesReplaced] message:messageStr delegate:self cancelButtonTitle:nil otherButtonTitles:[ParticleSetupStrings_Action_Yes variablesReplaced], [ParticleSetupStrings_Action_No variablesReplaced], nil];
+                        //current labs change end
                         [self.checkConnectionTimer invalidate];
                         
                         //Current Labs changes gets rid of the verification alert and sets it as claimed.
@@ -429,29 +536,36 @@
 
 
 - (void)photonPublicKey {
-    if (!self.gotPublicKey) {
-        [self.checkConnectionTimer invalidate];
-        ParticleSetupCommManager *manager = [[ParticleSetupCommManager alloc] init];
-        [manager publicKey:^(id responseCode, NSError *error) {
-            if (error) {
-                NSLog(@"Error sending public-key command to target: %@", error.localizedDescription);
-                [self restartDeviceDetectionTimer]; // TODO: better error handling
-                [self resetWifiSignalIconWithDelay];
-
-            } else {
-                NSInteger code = [responseCode integerValue];
-                if (code != 0) {
-                    NSLog(@"Public key retrival error");
+    //current labs changes
+    if ([ParticleSetupCustomization sharedInstance].isParticleDevice) {
+        //exisiting particle function
+        if (!self.gotPublicKey) {
+            [self.checkConnectionTimer invalidate];
+            ParticleSetupCommManager *manager = [[ParticleSetupCommManager alloc] init];
+            [manager publicKey:^(id responseCode, NSError *error) {
+                if (error) {
+                    NSLog(@"Error sending public-key command to target: %@", error.localizedDescription);
                     [self restartDeviceDetectionTimer]; // TODO: better error handling
                     [self resetWifiSignalIconWithDelay];
 
                 } else {
-                    self.gotPublicKey = YES;
-                    [self photonScanAP];
+                    NSInteger code = [responseCode integerValue];
+                    if (code != 0) {
+                        NSLog(@"Public key retrival error");
+                        [self restartDeviceDetectionTimer]; // TODO: better error handling
+                        [self resetWifiSignalIconWithDelay];
+
+                    } else {
+                        self.gotPublicKey = YES;
+                        [self photonScanAP];
+                    }
                 }
-            }
-        }];
+            }];
+        } else {
+            [self photonScanAP];
+        }
     } else {
+        //esp32 stuff
         [self photonScanAP];
     }
 }

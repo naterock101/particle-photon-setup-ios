@@ -97,7 +97,15 @@
         ParticleSetupPasswordEntryViewController *vc = [segue destinationViewController];
         vc.networkName = self.networkNameTextField.text;
         vc.channel = @0; // unknown
-        vc.security = @(ParticleSetupWifiSecurityTypeWPA2_AES_PSK); // default
+        //current labs changes
+        if ([ParticleSetupCustomization sharedInstance].isParticleDevice) {
+            //exisiting particle function
+             vc.security = @(ParticleSetupWifiSecurityTypeWPA2_AES_PSK); // default
+        } else {
+            //esp32 stuff
+            vc.security = @(ESPSetupWifiSecurityTypeWPA_WPA2_PSK); // default
+        }
+        //current labs changes end
         vc.deviceID = self.deviceID; // propagate device ID
         vc.needToClaimDevice = self.needToClaimDevice;
     }

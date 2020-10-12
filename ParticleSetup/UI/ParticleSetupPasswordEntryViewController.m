@@ -137,34 +137,65 @@
 }
 
 - (NSString *)convertSecurityTypeToString:(NSNumber *)securityType {
-    switch ([securityType intValue]) {
-        case ParticleSetupWifiSecurityTypeOpen:
-            return @"Open";
-            break;
-        case ParticleSetupWifiSecurityTypeWEP_PSK:
-            return @"WEP-PSK";
-            break;
-        case ParticleSetupWifiSecurityTypeWEP_SHARED:
-            return @"WEP-Shared";
-            break;
-        case ParticleSetupWifiSecurityTypeWPA_TKIP_PSK:
-            return @"WPA-TKIP";
-            break;
-        case ParticleSetupWifiSecurityTypeWPA_AES_PSK:
-            return @"WPA-AES";
-            break;
-        case ParticleSetupWifiSecurityTypeWPA2_AES_PSK:
-            return @"WPA2-AES";
-            break;
-        case ParticleSetupWifiSecurityTypeWPA2_TKIP_PSK:
-            return @"WPA2-TKIP";
-            break;
-        case ParticleSetupWifiSecurityTypeWPA2_MIXED_PSK:
-            return @"WPA2-Mixed";
-            break;
-        default:
-            return @"Unknown";
-            break;
+   //current labs changes
+    if ([ParticleSetupCustomization sharedInstance].isParticleDevice) {
+        //exisiting particle function
+        switch ([securityType intValue]) {
+            case ParticleSetupWifiSecurityTypeOpen:
+                return @"Open";
+                break;
+            case ParticleSetupWifiSecurityTypeWEP_PSK:
+                return @"WEP-PSK";
+                break;
+            case ParticleSetupWifiSecurityTypeWEP_SHARED:
+                return @"WEP-Shared";
+                break;
+            case ParticleSetupWifiSecurityTypeWPA_TKIP_PSK:
+                return @"WPA-TKIP";
+                break;
+            case ParticleSetupWifiSecurityTypeWPA_AES_PSK:
+                return @"WPA-AES";
+                break;
+            case ParticleSetupWifiSecurityTypeWPA2_AES_PSK:
+                return @"WPA2-AES";
+                break;
+            case ParticleSetupWifiSecurityTypeWPA2_TKIP_PSK:
+                return @"WPA2-TKIP";
+                break;
+            case ParticleSetupWifiSecurityTypeWPA2_MIXED_PSK:
+                return @"WPA2-Mixed";
+                break;
+            default:
+                return @"Unknown";
+                break;
+        }
+    } else {
+        //esp32 stuff
+        switch ([securityType intValue]) {
+            case ESPSetupWifiSecurityTypeOpen:
+                return @"Open";
+                break;
+            case ESPSetupWifiSecurityTypeWEP:
+                return @"WEP";
+                break;
+            case ESPSetupWifiSecurityTypeWEP_PSK:
+                return @"WEP-PSK";
+                break;
+            case ESPSetupWifiSecurityTypeWPA2_PSK:
+                return @"WPA2-PSK";
+                break;
+            case ESPSetupWifiSecurityTypeWPA_WPA2_PSK:
+                return @"WPA-WPA2-PSK";
+                break;
+            case ESPSetupWifiSecurityTypeWPA2_ENT:
+                return @"WPA2-ENT";
+                break;
+
+                
+            default:
+                return @"unknown";
+                break;
+        }
     }
 }
 
