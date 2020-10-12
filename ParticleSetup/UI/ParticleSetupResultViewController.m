@@ -238,7 +238,8 @@
         // TODO: condition message only if its really getting update zero (need event listening)
         if (![[NSUserDefaults standardUserDefaults] boolForKey:@"shownUpdateZeroNotice"]) {
             UIAlertView *alert = [[UIAlertView alloc] initWithTitle:[ParticleSetupStrings_SetupResult_Prompt_FirmwareUpdate_Title variablesReplaced] message:[ParticleSetupStrings_SetupResult_Prompt_FirmwareUpdate_Message variablesReplaced] delegate:nil cancelButtonTitle:[ParticleSetupStrings_Action_Understood variablesReplaced] otherButtonTitles:nil];
-            [alert show];
+            //Current Labs change to disable the alert about mageneta breathing
+            //[alert show];
 
             [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"shownUpdateZeroNotice"];
             [[NSUserDefaults standardUserDefaults] synchronize];
