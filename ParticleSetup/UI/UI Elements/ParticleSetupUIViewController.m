@@ -30,24 +30,8 @@
             [self setValue:@(UIUserInterfaceStyleLight) forKey:@"overrideUserInterfaceStyle"];
         }
     }
-
-    if ([ParticleSetupCustomization sharedInstance].pageBackgroundImage) {
-        UIImageView *backgroundImage = [[UIImageView alloc] initWithImage:[ParticleSetupCustomization sharedInstance].pageBackgroundImage];
-        backgroundImage.translatesAutoresizingMaskIntoConstraints = NO;
-        backgroundImage.contentMode = UIViewContentModeScaleToFill;
-
-        [self.view addSubview:backgroundImage];
-        [self.view sendSubviewToBack:backgroundImage];
-
-        [backgroundImage.leftAnchor constraintEqualToAnchor:self.view.leftAnchor].active = YES;
-        [backgroundImage.rightAnchor constraintEqualToAnchor:self.view.rightAnchor].active = YES;
-        [backgroundImage.topAnchor constraintEqualToAnchor:self.view.topAnchor].active = YES;
-        [backgroundImage.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor].active = YES;
-
-        _backgroundView = backgroundImage;
-    }
-
-
+    
+    //Current Labs change so that the image is BELOW the color to support our UI
     if ([ParticleSetupCustomization sharedInstance].pageBackgroundColor) //TODO: check this
     {
         UIView *view = [[UIView alloc] initWithFrame:[UIScreen mainScreen].bounds];
@@ -63,6 +47,23 @@
         [view.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor].active = YES;
 
         _backgroundView = view;
+    }
+    
+    
+    if ([ParticleSetupCustomization sharedInstance].pageBackgroundImage) {
+        UIImageView *backgroundImage = [[UIImageView alloc] initWithImage:[ParticleSetupCustomization sharedInstance].pageBackgroundImage];
+        backgroundImage.translatesAutoresizingMaskIntoConstraints = NO;
+        backgroundImage.contentMode = UIViewContentModeScaleToFill;
+
+        [self.view addSubview:backgroundImage];
+        [self.view sendSubviewToBack:backgroundImage];
+
+        [backgroundImage.leftAnchor constraintEqualToAnchor:self.view.leftAnchor].active = YES;
+        [backgroundImage.rightAnchor constraintEqualToAnchor:self.view.rightAnchor].active = YES;
+        [backgroundImage.topAnchor constraintEqualToAnchor:self.view.topAnchor].active = YES;
+        [backgroundImage.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor].active = YES;
+
+        _backgroundView = backgroundImage;
     }
 
     [self replaceSetupStrings:self.view];
