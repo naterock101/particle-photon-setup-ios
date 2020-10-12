@@ -378,7 +378,12 @@
                         NSString *messageStr = [ParticleSetupStrings_DiscoverDevices_Prompt_ClaimOwnership_Message variablesReplaced];
                         self.changeOwnershipAlertView = [[UIAlertView alloc] initWithTitle:[ParticleSetupStrings_DiscoverDevices_Prompt_ClaimOwnership_Title variablesReplaced] message:messageStr delegate:self cancelButtonTitle:nil otherButtonTitles:[ParticleSetupStrings_Action_Yes variablesReplaced], [ParticleSetupStrings_Action_No variablesReplaced], nil];
                         [self.checkConnectionTimer invalidate];
+                        
+                        //Current Labs changes gets rid of the verification alert and sets it as claimed.
                         [self.changeOwnershipAlertView show];
+                        self.needToCheckDeviceClaimed = YES;
+                        [self setDeviceClaimCode];
+                        
                     } else { // user skipped authentication so no need to claim or set claim code
                         self.needToCheckDeviceClaimed = NO;
                         [self goToWifiListScreen];
